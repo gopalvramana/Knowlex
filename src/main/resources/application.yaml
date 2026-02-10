@@ -1,21 +1,53 @@
 server:
   port: 8080
   name: DataIngestionService
+
 ingestion:
   chunk-size: 200
   chunk-overlap: 40
 
-  spring:
-    datasource:
-      url: jdbc:postgresql://localhost:5432/roms_db
-      username: roms_user
-      password: roms_password
-      driver-class-name: org.postgresql.Driver
+spring:
+  datasource:
+    url: jdbc:h2:mem:knowlexdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
 
-    jpa:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
       hibernate:
-        ddl-auto: update   # create, update, validate (use update for dev)
-      show-sql: true
-      properties:
-        hibernate:
-          format_sql: true
+        format_sql: true
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+---
+# PostgreSQL profile - activate with: mvn spring-boot:run -Dspring-boot.run.profiles=postgres
+spring:
+  config:
+    activate:
+      on-profile: postgres
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/roms_db
+    username: roms_user
+    password: roms_password
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  h2:
+    console:
+      enabled: false
