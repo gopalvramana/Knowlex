@@ -1,0 +1,21 @@
+server:
+  port: 8080
+  name: DataIngestionService
+ingestion:
+  chunk-size: 200
+  chunk-overlap: 40
+
+  spring:
+    datasource:
+      url: jdbc:postgresql://localhost:5432/roms_db
+      username: roms_user
+      password: roms_password
+      driver-class-name: org.postgresql.Driver
+
+    jpa:
+      hibernate:
+        ddl-auto: update   # create, update, validate (use update for dev)
+      show-sql: true
+      properties:
+        hibernate:
+          format_sql: true
