@@ -6,48 +6,43 @@ ingestion:
   chunk-size: 200
   chunk-overlap: 40
 
+embedding:
+  batch-size: 20      # chunks per OpenAI API call (max 2048 tokens per input)
+  parallelism: 4      # concurrent batch threads
+  search:
+    default-k: 5      # results returned when k is not specified
+    max-k: 50         # upper bound to prevent runaway queries
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+
+rag:
+  model: gpt-4o-mini   # LLM model to use for answer generation
+  max-tokens: 1024      # max tokens in LLM response
+  temperature: 0.2      # low temperature = more factual, less creative
+  default-top-k: 5      # chunks to retrieve when topK not set in request
+
 spring:
   datasource:
-    url: jdbc:h2:mem:knowlexdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:postgresql://localhost:5432/roms_db
+    username: roms_user
+    password: roms_pass
+    driver-class-name: org.postgresql.Driver
 
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
         format_sql: true
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
   servlet:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
-
----
-# PostgreSQL profile - activate with: mvn spring-boot:run -Dspring-boot.run.profiles=postgres
-spring:
-  config:
-    activate:
-      on-profile: postgres
-
-  datasource:
-    url: jdbc:postgresql://localhost:5432/roms_db
-    username: roms_user
-    password: roms_password
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
-
-  h2:
-    console:
-      enabled: false

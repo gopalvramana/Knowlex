@@ -13,7 +13,7 @@ public class DocumentChunk {
     private Map<String, Object> metadata = new HashMap<>();
 
     public DocumentChunk(String chunkId, String documentId, int chunkIndex, String content) {
-        this.chunkId = UUID.randomUUID().toString();
+        this.chunkId = chunkId;
         this.documentId = documentId;
         this.chunkIndex = chunkIndex;
         this.content = content;

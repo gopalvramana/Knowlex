@@ -2,12 +2,14 @@ package com.symphony.docweave.domain;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.UUID;
 
 @Entity
 @Table(name = "document_chunks")
 @Getter
+@Setter
 public class DocumentChunkEntity {
 
     @Id
@@ -20,8 +22,11 @@ public class DocumentChunkEntity {
     @Column(nullable = false)
     private int chunkIndex;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(name = "chunk_text", columnDefinition = "TEXT", nullable = false)
     private String content;
+
+    @Column(name = "embedding", columnDefinition = "vector(1536)")
+    private float[] embedding;
 
     protected DocumentChunkEntity() {} // JPA
 
