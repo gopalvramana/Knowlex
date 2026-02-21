@@ -13,9 +13,6 @@ embedding:
     default-k: 5      # results returned when k is not specified
     max-k: 50         # upper bound to prevent runaway queries
 
-openai:
-  api-key: ${OPENAI_API_KEY}
-
 rag:
   model: gpt-4o-mini   # LLM model to use for answer generation
   max-tokens: 1024      # max tokens in LLM response
