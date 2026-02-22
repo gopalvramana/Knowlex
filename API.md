@@ -7,15 +7,119 @@ All request and response bodies are `application/json` unless noted otherwise.
 
 ## Table of Contents
 
-1. [Document Ingestion](#1-document-ingestion)
-2. [Embeddings](#2-embeddings)
-3. [RAG (Retrieval-Augmented Generation)](#3-rag-retrieval-augmented-generation)
-4. [Error Responses](#4-error-responses)
-5. [End-to-End Workflow](#5-end-to-end-workflow)
+1. [How Embeddings Work](#1-how-embeddings-work)
+2. [Document Ingestion](#2-document-ingestion)
+3. [Embeddings](#3-embeddings)
+4. [RAG (Retrieval-Augmented Generation)](#4-rag-retrieval-augmented-generation)
+5. [Error Responses](#5-error-responses)
+6. [End-to-End Workflow](#6-end-to-end-workflow)
 
 ---
 
-## 1. Document Ingestion
+## 1. How Embeddings Work
+
+### What is an Embedding?
+
+An embedding is a fixed-size array of floating-point numbers (a vector) that represents the **semantic meaning** of a piece of text. Texts with similar meaning produce vectors that are mathematically close to each other, regardless of whether they share the same words.
+
+Knowlex uses OpenAI's **`text-embedding-3-small`** model, which produces a **1536-dimensional** vector for any input text.
+
+```
+"How does load balancing work?"  →  [0.02341, -0.01823, 0.00912, ...] (1536 numbers)
+"Distributing traffic across servers" →  [0.02289, -0.01791, 0.00934, ...] (very close)
+"My favourite recipe for pasta"  →  [-0.04521,  0.03812, -0.02341, ...] (far away)
+```
+
+---
+
+### Generation Pipeline
+
+When you call the embedding generate endpoints, the following steps happen:
+
+```
+Chunks in DB (no embedding)
+        │
+        ▼
+ ┌─────────────────────────────────────┐
+ │  EmbeddingService                   │
+ │  - Filter chunks where              │
+ │    embedding IS NULL                │
+ │  - Partition into batches of 20     │
+ │  - Submit batches to thread pool    │
+ │    (up to 4 parallel threads)       │
+ └──────────────┬──────────────────────┘
+                │  batch of text strings
+                ▼
+ ┌─────────────────────────────────────┐
+ │  OpenAiEmbeddingClient              │
+ │  - POST to OpenAI Embeddings API    │
+ │  - Retry up to 3× on failure        │
+ │    (1s → 2s → 4s back-off)         │
+ │  - Returns List<float[]>            │
+ └──────────────┬──────────────────────┘
+                │  1536-dim float[] per chunk
+                ▼
+ ┌─────────────────────────────────────┐
+ │  DocumentChunkRepository            │
+ │  - Save each chunk embedding in     │
+ │    its own transaction              │
+ │    (REQUIRES_NEW — progress is      │
+ │     preserved if later batch fails) │
+ └─────────────────────────────────────┘
+```
+
+**Key implementation details:**
+
+| Detail | Value | Reason |
+|---|---|---|
+| Model | `text-embedding-3-small` | 1536 dims, fast, cost-efficient |
+| Batch size | 20 chunks per API call | Reduces network round-trips |
+| Parallelism | 4 concurrent threads | Speeds up large document sets |
+| Retries | 3 attempts, exponential back-off | Handles rate limits and transient errors |
+| Transaction scope | Per-chunk (`REQUIRES_NEW`) | Progress is never lost on partial failure |
+| Idempotent | Yes — skips chunks where `embedding IS NOT NULL` | Safe to call repeatedly |
+
+---
+
+### Retrieval Pipeline
+
+When you search or ask a question, the query text goes through the same embedding model and is compared against stored chunk vectors using **cosine distance**:
+
+```
+User query string
+        │
+        ▼
+ OpenAI Embeddings API  →  query vector (1536 floats)
+        │
+        ▼
+ PostgreSQL + pgvector
+   SELECT ... FROM document_chunks
+   WHERE embedding IS NOT NULL
+   ORDER BY embedding <=> query_vector   ← cosine distance operator
+   LIMIT k
+        │
+        ▼
+ Top-K chunks ranked by similarity (score closer to 0 = more similar)
+```
+
+**Cosine distance** measures the angle between two vectors. A score of:
+- `0.0` — identical meaning
+- `0.0–0.2` — highly relevant
+- `0.2–0.5` — loosely related
+- `> 0.5` — likely unrelated
+
+The `embedding` column is stored as a native PostgreSQL `vector(1536)` type (provided by the [pgvector](https://github.com/pgvector/pgvector) extension), and an **IVFFlat index** is used to make similarity search fast even over large chunk sets:
+
+```sql
+CREATE INDEX idx_chunks_embedding
+ON document_chunks
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+```
+
+---
+
+## 2. Document Ingestion
 
 ### `POST /api/v1/documents`
 Upload and ingest a document (PDF). The service extracts text, splits it into chunks, and persists both to the database.
@@ -162,7 +266,7 @@ curl -X DELETE http://localhost:8080/api/v1/documents/a1b2c3d4-e5f6-7890-abcd-ef
 
 ---
 
-## 2. Embeddings
+## 3. Embeddings
 
 ### `POST /api/v1/embeddings/generate`
 Generate and store vector embeddings for **all** chunks across all documents that do not yet have an embedding. Processes in parallel batches.
@@ -248,7 +352,7 @@ curl -X POST "http://localhost:8080/api/v1/embeddings/search?k=3" \
 
 ---
 
-## 3. RAG (Retrieval-Augmented Generation)
+## 4. RAG (Retrieval-Augmented Generation)
 
 ### `POST /api/v1/rag/ask`
 The full RAG pipeline. Accepts a natural language question, retrieves the most relevant chunks from the knowledge base, and returns an LLM-generated answer grounded in those chunks.
@@ -319,7 +423,7 @@ curl -X POST http://localhost:8080/api/v1/rag/ask \
 
 ---
 
-## 4. Error Responses
+## 5. Error Responses
 
 All errors follow a consistent structure:
 
@@ -342,7 +446,7 @@ All errors follow a consistent structure:
 
 ---
 
-## 5. End-to-End Workflow
+## 6. End-to-End Workflow
 
 Follow these steps to go from a raw document to an answered question:
 
