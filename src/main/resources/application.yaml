@@ -20,6 +20,9 @@ openai:
 
 
 spring:
+  config:
+    import: optional:file:.env[.properties]   # loads .env if present; ignored in CI/prod
+
   datasource:
     url: jdbc:postgresql://localhost:5432/roms_db
     username: roms_user
