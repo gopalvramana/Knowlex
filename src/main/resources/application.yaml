@@ -17,6 +17,8 @@ openai:
   api-key: ${OPENAI_API_KEY}
   timeout-seconds: 30
 
+
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/roms_db
