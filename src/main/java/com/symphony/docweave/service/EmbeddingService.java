@@ -107,6 +107,7 @@ public class EmbeddingService {
                 saved++;
             } catch (Exception e) {
                 log.error("Failed to save embedding for chunk {}: {}", batch.get(i).getId(), e.getMessage());
+                System.out.println("Failed to save embedding for chunk " + batch.get(i).getId() + ": " + e.getMessage());
             }
         }
         return saved;

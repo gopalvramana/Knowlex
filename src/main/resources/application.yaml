@@ -13,11 +13,9 @@ embedding:
     default-k: 5      # results returned when k is not specified
     max-k: 50         # upper bound to prevent runaway queries
 
-rag:
-  model: gpt-4o-mini   # LLM model to use for answer generation
-  max-tokens: 1024      # max tokens in LLM response
-  temperature: 0.2      # low temperature = more factual, less creative
-  default-top-k: 5      # chunks to retrieve when topK not set in request
+openai:
+  api-key: ${OPENAI_API_KEY}
+  timeout-seconds: 30
 
 spring:
   datasource:
@@ -29,7 +27,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
