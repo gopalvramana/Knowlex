@@ -18,7 +18,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,21 +39,15 @@ public class EmbeddingService {
     // -------------------------------------------------------------------------
 
     public int generateEmbeddingsForAllChunks() {
-        List<DocumentChunkEntity> pending = chunkRepository.findAll().stream()
-                .filter(c -> c.getEmbedding() == null)
-                .collect(Collectors.toList());
-
+        // Use targeted query — avoids loading the pgvector column for all rows via findAll()
+        List<DocumentChunkEntity> pending = chunkRepository.findAllWithoutEmbedding();
         log.info("Found {} chunk(s) without embeddings", pending.size());
         return processBatchesInParallel(pending);
     }
 
     public int generateEmbeddingsForDocument(UUID documentId) {
-        List<DocumentChunkEntity> pending = chunkRepository
-                .findByDocumentIdOrderByChunkIndex(documentId)
-                .stream()
-                .filter(c -> c.getEmbedding() == null)
-                .collect(Collectors.toList());
-
+        // Use targeted query — avoids loading the pgvector column for all rows
+        List<DocumentChunkEntity> pending = chunkRepository.findByDocumentIdWithoutEmbedding(documentId);
         log.info("Document {}: {} chunk(s) need embeddings", documentId, pending.size());
         return processBatchesInParallel(pending);
     }
@@ -107,7 +100,6 @@ public class EmbeddingService {
                 saved++;
             } catch (Exception e) {
                 log.error("Failed to save embedding for chunk {}: {}", batch.get(i).getId(), e.getMessage());
-                System.out.println("Failed to save embedding for chunk " + batch.get(i).getId() + ": " + e.getMessage());
             }
         }
         return saved;
